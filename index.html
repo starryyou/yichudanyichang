@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>FBA退仓订单详情 · 异常情况与异常捕捉日志 优化原型</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Microsoft YaHei","微软雅黑",Arial,sans-serif;font-size:12.5px;color:#303133;background:#fafafa;-webkit-font-smoothing:antialiased;}
+.layout{display:flex;min-height:100vh;}
+/* ============ 侧栏（现网实色 #688DF5） ============ */
+.sidebar{width:206px;flex:0 0 206px;background:#688df5;display:flex;flex-direction:column;}
+.logo{height:52px;background:#688df5;color:#fff;display:flex;align-items:center;padding:0 16px;font-size:15px;letter-spacing:1px;font-weight:600;border-bottom:1px solid rgba(255,255,255,.16);}
+.logo span{font-size:11px;font-weight:400;opacity:.9;margin-left:6px;letter-spacing:0;}
+.lnav{padding:4px 0;flex:1;overflow-y:auto;}
+.nav-item,.nav-sub{display:flex;align-items:center;height:36px;padding:0 16px;color:#fff;font-size:12.5px;cursor:pointer;}
+.nav-item:hover,.nav-sub:hover{background:rgba(255,255,255,.14);}
+.nav-item.on{background:rgba(255,255,255,.2);box-shadow:inset 3px 0 0 #fff;font-weight:600;}
+.nav-sub{padding-left:28px;font-size:12px;}
+.nav-sub.on{background:rgba(255,255,255,.2);box-shadow:inset 3px 0 0 #fff;font-weight:600;}
+.nav-sub .ar{margin-left:auto;font-size:10px;opacity:.7;}
+/* ============ 主区 ============ */
+.workspace{flex:1;min-width:0;display:flex;flex-direction:column;background:#fff;}
+.topbar{height:40px;display:flex;align-items:center;padding:0 18px;font-size:12px;color:#909399;border-bottom:1px solid #ebeef5;gap:6px;}
+.topbar .ico{width:22px;height:22px;border-radius:3px;background:#eef2fb;display:inline-flex;align-items:center;justify-content:center;color:#688df5;font-size:11px;margin-right:4px;}
+.topbar .sys{margin-left:14px;color:#606266;}
+.topbar .time{margin-left:auto;color:#909399;}
+.topbar .act{color:#688df5;cursor:pointer;margin-left:12px;}
+.crumb{height:36px;display:flex;align-items:center;padding:0 18px;font-size:12px;color:#b7b4b7;gap:6px;border-bottom:1px solid #ebeef5;}
+.crumb b{color:#606266;font-weight:400;}
+.tabs{display:flex;align-items:center;padding:0 18px;border-bottom:1px solid #ebeef5;}
+.tab{height:40px;line-height:40px;padding:0 4px 0 0;margin-right:26px;font-size:12.5px;color:#606266;cursor:pointer;border-bottom:2px solid transparent;}
+.tab:hover{color:#688df5;}
+.tab.on{color:#688df5;font-weight:600;border-bottom-color:#688df5;}
+.content{flex:1;padding:12px 18px 20px;background:#fff;}
+/* ============ 筛选区 ============ */
+.filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.filters select,.filters input{height:30px;font-size:12.5px;font-family:inherit;color:#909399;border:1px solid #e2e4e8;border-radius:4px;padding:0 8px;background:#fff;outline:none;}
+.filters input{width:120px;}
+.filters input.ph{width:128px;}
+.filters select:focus,.filters input:focus{border-color:#688df5;}
+.filters select.on{border-color:#688df5;color:#688df5;font-weight:600;}
+.filters .dash{color:#c0c4cc;}
+.btn{height:30px;padding:0 16px;font-size:12.5px;border:1px solid #e2e4e8;background:#fff;color:#606266;border-radius:4px;cursor:pointer;font-family:inherit;}
+.btn:hover{border-color:#a4b5f8;color:#688df5;}
+.btn.primary{background:#688df5;border-color:#688df5;color:#fff;}
+.btn.primary:hover{background:#5578ef;color:#fff;}
+.btn.ghost{margin-left:auto;}
+/* ============ 统计条 ============ */
+.bar{display:flex;align-items:center;font-size:12px;color:#909399;margin:2px 0 8px;gap:14px;flex-wrap:wrap;}
+.bar em{font-style:normal;color:#303133;}
+.bar .sp{flex:1;}
+.bar .pgbox{display:flex;align-items:center;gap:6px;}
+.bar .pgbox select{height:26px;font-size:12px;color:#606266;border:1px solid #e2e4e8;border-radius:4px;font-family:inherit;}
+.pager{display:flex;align-items:center;gap:2px;}
+.pager .pg{min-width:24px;height:24px;line-height:23px;text-align:center;border:1px solid #e2e4e8;border-radius:3px;cursor:pointer;padding:0 5px;font-size:12px;color:#606266;}
+.pager .pg.on{background:#688df5;border-color:#688df5;color:#fff;}
+.pager .pg.no{border:none;color:#c0c4cc;}
+/* ============ 表格（现网样式：无竖线，表头浅灰底 + 底边 #DCDFE6） ============ */
+.tablewrap{overflow-x:auto;border-top:1px solid #dcdfe6;}
+table{width:100%;min-width:1618px;border-collapse:collapse;table-layout:fixed;}
+th{background:#e7ecf3;color:#4e5969;font-weight:600;font-size:12.5px;text-align:left;padding:0 10px;height:40px;border-right:1px solid #dcdfe6;border-bottom:1px solid #dcdfe6;white-space:nowrap;}
+th:last-child{border-right:none;}
+th.srt::after{content:"\2195";color:#b8bcc4;font-size:10px;margin-left:5px;font-weight:400;}
+td{padding:0 10px;height:44px;overflow:hidden;font-size:12.5px;color:#303133;border-bottom:1px solid #ebeef5;vertical-align:middle;line-height:1.5;white-space:nowrap;text-overflow:ellipsis;}
+tbody tr:hover td{background:#f7f9fc;}
+.cb{width:13px;height:13px;border:1px solid #dcdfe6;border-radius:2px;display:inline-block;vertical-align:middle;background:#fff;}
+.thumb{display:inline-flex;width:44px;height:32px;align-items:center;justify-content:center;border:1px solid #ebeef5;border-radius:2px;background:#f7f8fa;color:#b8bcc4;font-size:11px;vertical-align:middle;}
+.mono{font-family:Consolas,Monaco,monospace;font-size:12px;letter-spacing:.2px;color:#303133;}
+.clk{color:#688df5;cursor:pointer;}
+.muted{color:#b8bcc4;}
+/* ============ 异常行底色（沿用现网红系告警） ============ */
+tr.risk>td{background:#fff7f7;}
+tr.risk>td:first-child{box-shadow:inset 3px 0 0 #f56c6c;}
+tr.risk:hover>td{background:#fdeaea;}
+/* ============ 标签 ============ */
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:3px;font-size:12px;line-height:20px;border:1px solid #f8c9c9;background:#fef0f0;color:#e05c5c;margin-right:5px;white-space:nowrap;}
+.tag.gray{border-color:#e0e3e8;background:#f5f6f8;color:#909399;}
+/* ============ 异常情况列 ============ */
+.exc{white-space:normal;line-height:1.5;cursor:pointer;padding:6px 10px;}
+.exc:hover .tag{text-decoration:underline;}
+.exc .l2{margin-top:4px;}
+.exc .tk{font-family:Consolas,Monaco,monospace;font-size:12px;color:#c45656;margin-right:3px;}
+.exc .va{color:#303133;}
+.exc .cr{color:#c45656;}
+.exc .row{margin-top:2px;font-size:12px;line-height:1.45;}
+.exc .row .lbl{color:#a0a4ac;font-size:11.5px;margin-right:4px;}
+.exc .mt{margin-top:5px;}
+.exc .va b{font-weight:600;}
+.ok{color:#529b2e;font-weight:600;}
+/* ============ 异常捕捉日志列 ============ */
+.cap{display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;color:#529b2e;white-space:nowrap;}
+.cap i{width:6px;height:6px;border-radius:50%;background:#67c23a;display:inline-block;flex:0 0 auto;}
+.cap:hover{text-decoration:underline;}
+.cap.ok{color:#529b2e;} .cap.ok i{background:#67c23a;}
+.cap.part{color:#b88230;} .cap.part i{background:#e6a23c;}
+.cap.fail{color:#c45656;} .cap.fail i{background:#f56c6c;}
+/* ============ 展开明细行 ============ */
+tr.childrow>td{padding:0;background:#f7f9fc;border-bottom:1px solid #ebeef5;}
+.subwrap{padding:10px 12px 12px 32px;background:#f7f9fc;}
+table.subt{min-width:1300px;width:100%;}
+table.subt th{height:36px;background:#e7ecf3;color:#4e5969;font-size:12px;border-right:1px solid #dcdfe6;border-bottom:1px solid #dcdfe6;}
+table.subt th:last-child{border-right:none;}
+table.subt td{height:38px;padding:0 10px;font-size:12px;background:#fff;}
+table.subt tr:hover td{background:#f7f9fc;}
+table.subt tr.risk>td{background:#fff7f7;}
+table.subt tr.risk:hover>td{background:#fdeaea;}
+table.subt tr.risk>td:first-child{box-shadow:inset 3px 0 0 #f56c6c;}
+table.subt .exc{padding:4px 10px;}
+/* ============ 浮层 ============ */
+.pop{position:absolute;z-index:50;width:420px;background:#fff;border:1px solid #e4e7ed;border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,.14);padding:12px 14px;display:none;}
+.pop h4{font-size:13px;color:#303133;font-weight:600;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid #f0f2f5;}
+.pop.log{width:580px;}
+.pop h4 span{font-size:12px;color:#a0a4ac;font-weight:400;margin-left:8px;}
+.pop .r{display:flex;font-size:12px;line-height:1.9;color:#303133;}
+.pop .r span:first-child{flex:0 0 88px;color:#909399;}
+.pop .r span:last-child{flex:1;min-width:0;word-break:break-word;}
+.pop .r.hi span:last-child{color:#c45656;font-weight:600;}
+.loghd,.logrow{display:grid;grid-template-columns:50px 104px 52px minmax(0,1fr);gap:8px;align-items:start;}
+.loghd{font-size:12px;color:#909399;padding:5px 0 6px;border-bottom:1px solid #ebeef5;}
+.logrow{font-size:12px;color:#303133;padding:6px 0;border-bottom:1px dashed #f2f4f7;line-height:1.6;}
+.logrow:last-child{border-bottom:none;}
+.loghd span,.logrow span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.logrow .rs{white-space:normal;word-break:break-word;}
+.logrow .st{font-weight:600;}
+.logrow .st.ok{color:#529b2e;} .logrow .st.part{color:#b88230;} .logrow .st.fail{color:#c45656;} .logrow .st.skip{color:#a0a4ac;font-weight:400;}
+.logrow .rs{color:#606266;word-break:break-word;}
+
+/* ============ 多跟踪号 / 未判定 ============ */
+.tkmulti{white-space:normal;line-height:1.6;font-size:12px;}
+.tkline{line-height:1.8;}
+.ud{color:#909399;font-size:12px;margin-left:2px;}
+.ok2{color:#a0a4ac;font-size:12px;margin-left:2px;}
+.tk2{font-family:Consolas,Monaco,monospace;font-size:12px;color:#c45656;line-height:1.55;margin-top:1px;letter-spacing:.2px;}
+table.subt td.exc{padding-top:7px;padding-bottom:7px;vertical-align:top;}
+table.subt td{vertical-align:middle;}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="logo">销售系统<span>IMC</span></div>
+    <nav class="lnav">
+      <div class="nav-item">首页</div>
+      <div class="nav-item">公共服务</div>
+      <div class="nav-item">平台服务</div>
+      <div class="nav-item on">Amazon<span class="ar">&#9660;</span></div>
+      <div class="nav-sub on">运营工具</div>
+      <div class="nav-sub">店铺管理</div>
+      <div class="nav-sub">刊登管理</div>
+      <div class="nav-sub">Listing管理</div>
+      <div class="nav-sub">库存校准</div>
+      <div class="nav-sub">日志管理</div>
+      <div class="nav-item">AliExpress</div>
+      <div class="nav-item">Shopee</div>
+      <div class="nav-item">Lazada</div>
+      <div class="nav-item">Mercadolibre</div>
+      <div class="nav-item">eBay</div>
+      <div class="nav-item">Daraz</div>
+      <div class="nav-item">Walmart</div>
+    </nav>
+  </aside>
+
+  <div class="workspace">
+    <div class="topbar">
+      <span class="ico">&#9776;</span>
+      <span>&#9733;</span><span>开发者引用demo</span>
+      <span class="sys">AM-FBA移除单管理</span>
+      <span class="time">系统更新时间 2026-11-25 10:20:00</span>
+      <span class="act">保存搜索条件</span>
+      <span class="act">读取搜索条件</span>
+    </div>
+    <div class="crumb"><span>Amazon</span><span>&gt;</span><span>运营工具</span><span>&gt;</span><b>AM-FBA移除单管理</b></div>
+    <div class="tabs">
+      <div class="tab">FBA移除订单</div>
+      <div class="tab on">FBA退仓订单详情</div>
+      <div class="tab">FBA弃置订单详情</div>
+    </div>
+
+    <div class="content">
+      <div class="filters">
+        <select><option>移除状态</option><option>待处理</option><option>完成</option><option>部分入库</option></select>
+        <select id="fType" onchange="applyFilter()">
+          <option value="all">异常情况</option>
+          <option value="addr">地址填写异常</option>
+          <option value="city">送达城市异常</option>
+          <option value="late">超期未送达</option>
+          <option value="short">未足额入库</option>
+        </select>
+        <select><option>日期类型</option><option>创建时间</option><option>操作时间</option></select>
+        <input class="ph" placeholder="&#128197; 开始日期" readonly>
+        <span class="dash">-</span>
+        <input class="ph" placeholder="结束日期" readonly>
+        <select><option>移除单号</option><option>跟踪号</option></select>
+        <input placeholder="请输入内容" style="width:150px;">
+        <button class="btn primary">搜索</button>
+        <button class="btn" onclick="resetFilter()">重置</button>
+      </div>
+
+      <div class="bar">
+        <span>已选 <em>0</em> 条　共 <em>13478</em> 条</span>
+        <span class="sp"></span>
+        <span class="pgbox">
+          <select><option>10条/页</option><option>20条/页</option><option>50条/页</option></select>
+          <div class="pager">
+            <span class="pg no">&lsaquo;</span><span class="pg on">1</span><span class="pg">2</span>
+            <span class="pg">3</span><span class="pg">4</span><span class="pg">5</span><span class="pg">6</span>
+            <span class="pg no">...</span><span class="pg">1348</span><span class="pg">&rsaquo;</span>
+          </div>
+          <span>前往</span><input style="width:38px;height:26px;border:1px solid #e2e4e8;border-radius:3px;text-align:center;font-size:12px;" value="1"><span>页</span>
+        </span>
+      </div>
+
+      <div class="tablewrap">
+        <table id="main">
+          <colgroup>
+            <col style="width:74px"><col style="width:104px"><col style="width:112px"><col style="width:78px"><col style="width:78px">
+            <col style="width:268px"><col style="width:62px">
+            <col style="width:132px"><col style="width:104px"><col style="width:140px"><col style="width:70px"><col style="width:54px">
+            <col style="width:54px"><col style="width:54px"><col style="width:200px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th></th><th class="srt">移除单号</th><th class="srt">移除单子号</th><th>移除状态</th><th>关联状态</th>
+              <th>异常情况</th><th>图片</th>
+              <th>平台sku</th><th>FNSKU</th><th>sku</th><th>产品编号</th><th>申请</th>
+              <th>已发货</th><th>已入库</th><th>异常捕捉日志</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <tr class="parent risk" data-types="addr" data-g="g1">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g1',this)">&#9662;</span></td>
+              <td class="mono">R08TIU5004</td>
+              <td class="mono">R08TIU5004-13</td>
+              <td>完成</td><td>完全入库</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x1"><span class="tag">地址填写异常</span><div class="row"><span class="lbl">填写</span><span class="va">12 High St, GL50 1AA</span></div><div class="row"><span class="lbl">正确</span><span class="cr">Unit 5, GL51 9WR</span></div></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono">ST-sari6V14m4cE4-4d0-E001YdTRf2nmRy</td>
+              <td class="mono">B08SMKZNQS</td>
+              <td class="mono">FBA-CA-8ITUK-8D034670</td>
+              <td class="mono">1S0244</td>
+              <td>10</td><td>10</td><td>10</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l1"><span class="cap ok" onclick="showPop(event,this)" data-pop="l1"><i></i>正常</span></td>
+            </tr>
+            <tr class="childrow" data-g="g1" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr><td class="mono">ACUK23120900114</td><td class="mono tkmulti">FU98503178208GB</td><td class="tkmulti">ROYAL_MAIL</td><td>2026-07-26</td><td class="tkmulti">Cheltenham</td><td>4</td><td>4</td><td>0</td><td class="muted">—</td><td class="exc" onclick="showPop(event,this)" data-pop="l1"><span class="cap ok" onclick="showPop(event,this)" data-pop="l1"><i></i>正常</span></td><td>黎锦亮</td><td>2026-07-28 09:30</td></tr>
+                    <tr><td class="mono">ACUK23120900114</td><td class="mono tkmulti">FU985031411GB</td><td class="tkmulti">ROYAL_MAIL</td><td>2026-07-26</td><td class="tkmulti">Cheltenham</td><td>4</td><td>4</td><td>0</td><td class="muted">—</td><td class="exc" onclick="showPop(event,this)" data-pop="l1"><span class="cap ok" onclick="showPop(event,this)" data-pop="l1"><i></i>正常</span></td><td>黎锦亮</td><td>2026-07-28 09:30</td></tr>
+                    <tr><td class="mono">ACUK23120900114</td><td class="mono tkmulti">TBA33366312418</td><td class="tkmulti">AMZL_US_PREMIUM</td><td>2026-07-27</td><td class="tkmulti">Cheltenham</td><td>2</td><td>2</td><td>0</td><td class="muted">—</td><td class="exc" onclick="showPop(event,this)" data-pop="l1"><span class="cap ok" onclick="showPop(event,this)" data-pop="l1"><i></i>正常</span></td><td>黎锦亮</td><td>2026-07-28 09:30</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent risk" data-types="city" data-g="g2">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g2',this)">&#9662;</span></td>
+              <td class="mono">R03TJU0073</td>
+              <td class="mono">R03TJU0073-1</td>
+              <td>完成</td><td>完全入库</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x2"><span class="tag">送达城市异常</span><span class="tk">FU985032054GB</span><div class="row"><span class="lbl">送达</span><span class="cr">Bristol</span><span class="lbl">正确</span><span class="va">Cheltenham</span></div></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono">26-l078g5o6c13h1Jx4w-vw</td>
+              <td class="mono">X001TI6RYC1</td>
+              <td class="mono">FBA0E-3J-TUK-160303810044</td>
+              <td class="mono">1S0183</td>
+              <td>15</td><td>0</td><td>0</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l2"><span class="cap ok" onclick="showPop(event,this)" data-pop="l2"><i></i>正常</span></td>
+            </tr>
+            <tr class="childrow" data-g="g2" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr class="risk"><td class="mono">ACUK23120800068</td><td class="mono tkmulti">FU985032054GB<br>FU985031118GB</td><td class="tkmulti">ROYAL_MAIL<br>ROYAL_MAIL</td><td>2026-08-06</td><td class="tkmulti">Bristol<br>Cheltenham</td><td>15</td><td>0</td><td>15</td><td class="exc" onclick="showPop(event,this)" data-pop="x2"><div class="tkline"><span class="tk">FU985032054GB</span><span class="tag">送达城市异常</span></div><div class="row"><span class="lbl">送达</span><span class="cr">Bristol</span><span class="lbl">正确</span><span class="va">Cheltenham</span></div><div class="tkline"><span class="tk">FU985031118GB</span><span class="ok2">无异常</span></div></td><td class="exc" onclick="showPop(event,this)" data-pop="l2"><span class="cap ok" onclick="showPop(event,this)" data-pop="l2"><i></i>正常</span></td><td>刘敏</td><td>2026-08-08 14:05</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent risk" data-types="late,short" data-g="g3">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g3',this)">&#9662;</span></td>
+              <td class="mono">R03TJU0024</td>
+              <td class="mono">R03TJU0024-1</td>
+              <td>部分入库</td><td>完全入库</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x3"><span class="tag">超期未送达</span><span class="tk">TBA33367120054</span><div class="row"><span class="lbl">已发货</span><b class="cr">37 天</b><span class="lbl">阈值</span><span class="va">15 天</span></div><div class="row mt"><span class="tag">未足额入库</span><span class="tk">FU985030776GB</span></div><div class="row"><span class="lbl">已送达</span><b class="cr">32 天</b><span class="lbl">未入库</span><b class="cr">40 件</b></div></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono">FBAUS-01694151331549B1-090000257</td>
+              <td class="mono">XD425WR1F</td>
+              <td class="mono">FBAUS-01ITUS-26000031091</td>
+              <td class="mono">1S0291</td>
+              <td>400</td><td>364</td><td>302</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l3"><span class="cap ok" onclick="showPop(event,this)" data-pop="l3"><i></i>正常</span></td>
+            </tr>
+            <tr class="childrow" data-g="g3" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr class="risk"><td class="mono">ACUK23120700321</td><td class="mono tkmulti">TBA33367120054<br>FU985030912GB</td><td class="tkmulti">AMZL_US_PREMIUM<br>ROYAL_MAIL</td><td>2026-07-18</td><td class="tkmulti">—<br>Cheltenham</td><td>124</td><td>98</td><td>26</td><td class="exc" onclick="showPop(event,this)" data-pop="x3"><div class="tkline"><span class="tk">TBA33367120054</span><span class="tag">超期未送达</span></div><div class="row"><span class="lbl">已发货</span><b class="cr">37 天</b><span class="lbl">阈值</span><span class="va">15 天</span></div><div class="tkline"><span class="tk">FU985030912GB</span><span class="ok2">无异常</span></div></td><td class="exc" onclick="showPop(event,this)" data-pop="l3"><span class="cap ok" onclick="showPop(event,this)" data-pop="l3"><i></i>正常</span></td><td>王海</td><td>2026-07-20 10:12</td></tr>
+                    <tr class="risk"><td class="mono">ACUK23120800033</td><td class="mono tkmulti">FU985030776GB</td><td class="tkmulti">ROYAL_MAIL</td><td>2026-07-22</td><td class="tkmulti">Cheltenham</td><td>240</td><td>200</td><td>40</td><td class="exc" onclick="showPop(event,this)" data-pop="x3"><div class="tkline"><span class="tk">FU985030776GB</span><span class="tag">未足额入库</span></div><div class="row"><span class="lbl">已送达</span><b class="cr">32 天</b><span class="lbl">阈值</span><span class="va">30 天</span></div><div class="row"><span class="lbl">未入库</span><b class="cr">40 件</b></div></td><td class="exc" onclick="showPop(event,this)" data-pop="l3"><span class="cap ok" onclick="showPop(event,this)" data-pop="l3"><i></i>正常</span></td><td>王海</td><td>2026-07-20 10:12</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent" data-types="" data-g="g4">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g4',this)">&#9662;</span></td>
+              <td class="mono">R0NFUS0012</td>
+              <td class="mono">R0NFUS0012-1</td>
+              <td>完成</td><td>完全入库</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x4"><span class="muted">—</span></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono">FBAUS-N694151354B426F-890000088</td>
+              <td class="mono">XD03XRN58H</td>
+              <td class="mono">FBAUS-NRUS-890000088</td>
+              <td class="mono">1S0088</td>
+              <td>20</td><td>20</td><td>20</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l4"><span class="cap ok" onclick="showPop(event,this)" data-pop="l4"><i></i>正常</span></td>
+            </tr>
+            <tr class="childrow" data-g="g4" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr><td class="mono">ACUK23121000077</td><td class="mono tkmulti">FU985033401GB</td><td class="tkmulti">ROYAL_MAIL</td><td>2026-07-30</td><td class="tkmulti">Cheltenham</td><td>20</td><td>20</td><td>0</td><td class="muted">—</td><td class="exc" onclick="showPop(event,this)" data-pop="l4"><span class="cap ok" onclick="showPop(event,this)" data-pop="l4"><i></i>正常</span></td><td>黎锦亮</td><td>2026-08-01 11:20</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent" data-types="" data-g="g5">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g5',this)">&#9662;</span></td>
+              <td class="mono">R03TJU0058</td>
+              <td class="mono">R03TJU0058-1</td>
+              <td>待处理</td><td>未关联</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x5"><span class="tag gray">未判定</span></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td>8</td><td>0</td><td>0</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l5"><span class="cap fail" onclick="showPop(event,this)" data-pop="l5"><i></i>店铺登录异常</span></td>
+            </tr>
+            <tr class="childrow" data-g="g5" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent" data-types="" data-g="g6">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g6',this)">&#9662;</span></td>
+              <td class="mono">R0US0JD47A</td>
+              <td class="mono">R0US0JD47A-1</td>
+              <td>完成</td><td>完全入库</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x6"><span class="tag gray">未判定</span><div class="row"><span class="lbl">送达城市、超期未送达</span></div><div class="row"><span class="tk">FU985034112GB</span><span class="tk">FU985034298GB</span></div></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono">FBAUS-6N1415133154B1-890000221</td>
+              <td class="mono">X004T07V2P</td>
+              <td class="mono">FBAUS-6RUS-890000221</td>
+              <td class="mono">1S0221</td>
+              <td>30</td><td>30</td><td>30</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l6"><span class="cap fail" onclick="showPop(event,this)" data-pop="l6"><i></i>跟踪号无物流轨迹</span><div class="tk2">FU985034112GB<br>FU985034298GB</div></td>
+            </tr>
+            <tr class="childrow" data-g="g6" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr class="risk"><td class="mono">ACUK23121100033</td><td class="mono tkmulti">FU985034112GB<br>FU985034298GB</td><td class="tkmulti">ROYAL_MAIL<br>ROYAL_MAIL</td><td>2026-08-02</td><td class="tkmulti">—<br>—</td><td>30</td><td>30</td><td>0</td><td class="exc" onclick="showPop(event,this)" data-pop="x6"><div class="tkline"><span class="tk">FU985034112GB</span><span class="ud">送达城市、超期未送达 未判定</span></div><div class="tkline"><span class="tk">FU985034298GB</span><span class="ud">送达城市、超期未送达 未判定</span></div></td><td class="exc" onclick="showPop(event,this)" data-pop="l6"><span class="cap fail" onclick="showPop(event,this)" data-pop="l6"><i></i>跟踪号无物流轨迹</span><div class="tk2">FU985034112GB<br>FU985034298GB</div></td><td>刘敏</td><td>2026-08-04 16:40</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent risk" data-types="addr,short" data-g="g7">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g7',this)">&#9662;</span></td>
+              <td class="mono">R02TJU0041</td>
+              <td class="mono">R02TJU0041-1</td>
+              <td>部分入库</td><td>完全入库</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x7"><span class="tag">地址填写异常</span><div class="row"><span class="lbl">填写</span><span class="va">Unit 3, GL51 9PB</span></div><div class="row"><span class="lbl">正确</span><span class="cr">Unit 5, GL51 9WR</span></div><div class="row mt"><span class="tag">未足额入库</span><span class="tk">FU985028114GB</span></div><div class="row"><span class="lbl">已送达</span><b class="cr">52 天</b><span class="lbl">未入库</span><b class="cr">18 件</b></div></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono">B07YQ3Z7H1-CA</td>
+              <td class="mono">X003TZ8R6N</td>
+              <td class="mono">FBA-CA-2QW7-4412033</td>
+              <td class="mono">1S0203</td>
+              <td>60</td><td>60</td><td>42</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l7"><span class="cap ok" onclick="showPop(event,this)" data-pop="l7"><i></i>正常</span></td>
+            </tr>
+            <tr class="childrow" data-g="g7" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr class="risk"><td class="mono">ACUK23120500612</td><td class="mono tkmulti">FU985028114GB<br>FU985028301GB</td><td class="tkmulti">ROYAL_MAIL<br>ROYAL_MAIL</td><td>2026-06-28</td><td class="tkmulti">Cheltenham<br>Cheltenham</td><td>60</td><td>42</td><td>18</td><td class="exc" onclick="showPop(event,this)" data-pop="x7"><div class="tkline"><span class="tk">FU985028114GB</span><span class="tag">未足额入库</span></div><div class="row"><span class="lbl">已送达</span><b class="cr">52 天</b><span class="lbl">阈值</span><span class="va">30 天</span><span class="lbl">未入库</span><b class="cr">18 件</b></div><div class="tkline"><span class="tk">FU985028301GB</span><span class="ok2">无异常</span></div></td><td class="exc" onclick="showPop(event,this)" data-pop="l7"><span class="cap ok" onclick="showPop(event,this)" data-pop="l7"><i></i>正常</span></td><td>王海</td><td>2026-06-30 08:44</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent" data-types="" data-g="g8">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g8',this)">&#9662;</span></td>
+              <td class="mono">R0NFUS0034</td>
+              <td class="mono">R0NFUS0034-1</td>
+              <td>发货中</td><td>未关联</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x8"><span class="tag gray">未判定</span></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td>12</td><td>12</td><td>0</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l8"><span class="cap fail" onclick="showPop(event,this)" data-pop="l8"><i></i>爬虫获取数据失败</span></td>
+            </tr>
+            <tr class="childrow" data-g="g8" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent" data-types="" data-g="g9">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g9',this)">&#9662;</span></td>
+              <td class="mono">R03TJU0066</td>
+              <td class="mono">R03TJU0066-1</td>
+              <td>待处理</td><td>未关联</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x9"><span class="tag gray">未判定</span></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td class="mono"><span class="muted">—</span></td>
+              <td>6</td><td>0</td><td>0</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l9"><span class="cap fail" onclick="showPop(event,this)" data-pop="l9"><i></i>紫鸟浏览器登录异常</span></td>
+            </tr>
+            <tr class="childrow" data-g="g9" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+
+            <tr class="parent" data-types="" data-g="g10">
+              <td><span class="cb"></span> <span class="clk" onclick="toggle('g10',this)">&#9662;</span></td>
+              <td class="mono">R0NFUS0071</td>
+              <td class="mono">R0NFUS0071-1</td>
+              <td>部分入库</td><td>完全入库</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="x10"><span class="tag gray">未判定</span><div class="row"><span class="tk">FU985036612GB</span><span class="lbl">四道校验</span></div></td>
+              <td><span class="thumb">加载失败</span></td>
+              <td class="mono">FBAUS-7K2151413264C2-890000148</td>
+              <td class="mono">X008M11N9Q</td>
+              <td class="mono">FBAUS-7RUS-890000148</td>
+              <td class="mono">1S0148</td>
+              <td>24</td><td>12</td><td>12</td>
+              <td class="exc" onclick="showPop(event,this)" data-pop="l10"><span class="cap fail" onclick="showPop(event,this)" data-pop="l10"><i></i>爬虫获取数据失败</span><div class="tk2">FU985036612GB</div></td>
+            </tr>
+            <tr class="childrow" data-g="g10" style="display:none;"><td colspan="15">
+              <div class="subwrap">
+                <table class="subt">
+                  <colgroup>
+                    <col style="width:136px"><col style="width:150px"><col style="width:110px"><col style="width:88px"><col style="width:86px">
+                    <col style="width:64px"><col style="width:66px"><col style="width:66px"><col style="width:300px"><col style="width:200px">
+                    <col style="width:70px"><col style="width:120px">
+                  </colgroup>
+                  <thead><tr>
+                    <th>调拨单</th><th>跟踪号</th><th>承运商</th><th>发货时间</th><th>位置</th>
+                    <th>已发货数量</th><th>已入库数量</th><th>未入库数量</th><th>异常情况</th><th>异常捕捉日志</th>
+                    <th>操作人</th><th>操作时间</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr class="risk"><td class="mono">ACUK23121400055</td><td class="mono tkmulti">FU985036612GB<br>FU985036700GB</td><td class="tkmulti">ROYAL_MAIL<br>ROYAL_MAIL</td><td>2026-08-14</td><td class="tkmulti">—<br>Cheltenham</td><td>24</td><td>12</td><td>12</td><td class="exc" onclick="showPop(event,this)" data-pop="x10"><div class="tkline"><span class="tk">FU985036612GB</span><span class="ud">四道校验 未判定</span></div><div class="tkline"><span class="tk">FU985036700GB</span><span class="ok2">无异常</span></div></td><td class="exc" onclick="showPop(event,this)" data-pop="l10"><span class="cap fail" onclick="showPop(event,this)" data-pop="l10"><i></i>爬虫获取数据失败</span><div class="tk2">FU985036612GB</div></td><td>刘敏</td><td>2026-08-16 09:15</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pop" id="pop"></div>
+
+<script>
+/* ================= 异常情况浮层：判定数据（含具体值与正确值） ================= */
+var XPOP = {
+  x1:{t:'地址填写异常',sub:'R08TIU5004　移除单级',rows:[
+    ['填写地址','12 High Street, Cheltenham, GL50 1AA'],
+    ['正确地址','Unit 5, Kingsditch Lane, Cheltenham, GL51 9WR'],
+    ['不一致项','邮编 GL50 1AA 应为 GL51 9WR']],hi:2},
+  x2:{t:'送达城市异常',sub:'R03TJU0073　跟踪号级',rows:[
+    ['异常跟踪号','FU985032054GB（调拨单 ACUK23120800068）'],
+    ['实际送达','Bristol（承运商终态事件 2026-08-10）'],
+    ['正确送达','Cheltenham（目标仓所在城市）']],hi:0},
+  x3:{t:'超期未送达 / 未足额入库',sub:'R03TJU0024　跟踪号级',rows:[
+    ['超期未送达','TBA33367120054　发货 2026-07-18　已发货 37 天（阈值 15）'],
+    ['未足额入库','FU985030776GB　送达 2026-07-22　已送达 32 天（阈值 30）　未入库 40 件'],
+    ['同单其他跟踪号','FU985030912GB 未发现异常']],hi:0},
+  x4:{t:'未发现异常',sub:'R0NFUS0012　移除单级',rows:[
+    ['地址填写','邮编、城市、州省一致'],
+    ['送达城市','Cheltenham = Cheltenham'],
+    ['超期未送达','已送达，未超期'],
+    ['未足额入库','已发货 20 / 已入库 20']]},
+  x5:{t:'未判定 · 店铺登录异常',sub:'R03TJU0058　移除单级',rows:[
+    ['结论','四道校验均未执行，不得按无异常处理'],
+    ['影响范围','地址填写、送达城市、超期未送达、未足额入库（整张移除单）'],
+    ['跟踪号','未取到，无法定位到具体跟踪号']]},
+  x6:{t:'未判定 · 跟踪号无物流轨迹',sub:'R0US0JD47A　跟踪号级',rows:[
+    ['异常跟踪号','FU985034112GB、FU985034298GB（调拨单 ACUK23121100033）'],
+    ['未判定项','送达城市、超期未送达'],
+    ['已通过项','地址填写、未足额入库'],
+    ['原因','两个跟踪号在承运商侧查询无记录，返回空轨迹']]},
+  x7:{t:'地址填写异常 / 未足额入库',sub:'R02TJU0041　移除单级 + 跟踪号级',rows:[
+    ['填写地址','Unit 3, Kingsditch Lane, GL51 9PB'],
+    ['正确地址','Unit 5, Kingsditch Lane, GL51 9WR'],
+    ['不一致项','邮编 GL51 9PB 应为 GL51 9WR'],
+    ['未足额入库','FU985028114GB　送达 2026-07-02　已送达 52 天（阈值 30）　未入库 18 件']],hi:2},
+  x8:{t:'未判定 · 爬虫获取数据失败',sub:'R0NFUS0034　移除单级',rows:[
+    ['结论','四道校验均未执行，不得按无异常处理'],
+    ['影响范围','整张移除单的地址、城市、时效、入库数量均未取到'],
+    ['原因','移除单详情页请求超时（60 秒无响应），重试 1 次仍超时']]},
+  x9:{t:'未判定 · 紫鸟浏览器登录异常',sub:'R03TJU0066　移除单级',rows:[
+    ['结论','未进入浏览器环境，四道校验均未执行'],
+    ['影响范围','该环境下的全部店铺，本移除单数据完全未取到'],
+    ['原因','紫鸟客户端未启动，店铺与环境绑定失效']]},
+  x10:{t:'未判定 · 爬虫获取数据失败',sub:'R0NFUS0071　跟踪号级',rows:[
+    ['异常跟踪号','FU985036612GB（调拨单 ACUK23121400055）'],
+    ['未判定项','四道校验'],
+    ['同单其他跟踪号','FU985036700GB 已正常取到并完成校验']],hi:0}
+};
+
+var LPOP = {
+  l1:{t:'异常捕捉日志',sub:'R08TIU5004　2026-08-24 03:12—03:22',rows:[
+    ['03:12','进入店铺','ok','紫鸟环境正常，已登录 UK - Cheltenham 主账号'],
+    ['03:14','抓取配送地址','ok','地址、数量字段完整'],
+    ['03:16','抓取追踪信息','ok','3 个跟踪号，调拨单号均已关联'],
+    ['03:20','查询物流轨迹','ok','3 / 3 成功'],
+    ['03:22','执行四道校验','fail','地址填写异常：邮编 GL50 1AA 应为 GL51 9WR；其余三道通过']]},
+  l2:{t:'异常捕捉日志',sub:'R03TJU0073　2026-08-24 03:11—03:21',rows:[
+    ['03:11','进入店铺','ok','紫鸟环境正常，已登录 UK - Cheltenham 主账号'],
+    ['03:13','抓取配送地址','ok','地址、数量字段完整'],
+    ['03:15','抓取追踪信息','ok','2 个跟踪号，同属调拨单 ACUK23120800068'],
+    ['03:18','查询物流轨迹','ok','2 / 2 成功'],
+    ['03:21','执行四道校验','fail','送达城市异常：FU985032054GB 送达 Bristol 应为 Cheltenham']]},
+  l3:{t:'异常捕捉日志',sub:'R03TJU0024　2026-08-24 03:14—03:24',rows:[
+    ['03:14','进入店铺','ok','紫鸟环境正常，已登录 UK - Cheltenham 主账号'],
+    ['03:16','抓取配送地址','ok','地址、数量字段完整'],
+    ['03:18','抓取追踪信息','ok','3 个跟踪号'],
+    ['03:21','查询物流轨迹','ok','3 / 3 成功'],
+    ['03:24','执行四道校验','fail','超期未送达：TBA33367120054；未足额入库：FU985030776GB']]},
+  l4:{t:'异常捕捉日志',sub:'R0NFUS0012　2026-08-24 03:09—03:19',rows:[
+    ['03:09','进入店铺','ok','紫鸟环境正常，已登录 US - Ontario 主账号'],
+    ['03:11','抓取配送地址','ok','地址、数量字段完整'],
+    ['03:13','抓取追踪信息','ok','1 个跟踪号'],
+    ['03:16','查询物流轨迹','ok','1 / 1 成功'],
+    ['03:19','执行四道校验','ok','四道校验均通过']]},
+  l5:{t:'异常捕捉日志 · 移除单级',sub:'R03TJU0058　2026-08-24 03:05—03:08',rows:[
+    ['03:05','进入店铺','fail','店铺登录异常：登录态已过期，跳转登录页后要求验证码，程序无法通过'],
+    ['03:08','抓取配送地址','skip','未进入店铺，未执行'],
+    ['—','抓取追踪信息','skip','无地址数据，未执行'],
+    ['—','查询物流轨迹','skip','无跟踪号，未执行'],
+    ['—','执行四道校验','skip','无数据，未执行']]},
+  l6:{t:'异常捕捉日志 · 跟踪号级',sub:'R0US0JD47A　2026-08-24 03:16—03:41',rows:[
+    ['03:16','进入店铺','ok','紫鸟环境正常，已登录 UK - Cheltenham 主账号'],
+    ['03:18','抓取配送地址','ok','地址字段完整'],
+    ['03:20','抓取追踪信息','ok','2 个跟踪号，均属 ACUK23121100033'],
+    ['03:24','查询物流轨迹','fail','跟踪号无物流轨迹：FU985034112GB、FU985034298GB 承运商侧查无记录，各重试 1 次仍为空'],
+    ['03:41','执行四道校验','part','地址、未足额入库通过；送达城市、超期未送达未判定']]},
+  l7:{t:'异常捕捉日志',sub:'R02TJU0041　2026-08-24 03:17—03:26',rows:[
+    ['03:17','进入店铺','ok','紫鸟环境正常，已登录 UK - Cheltenham 主账号'],
+    ['03:19','抓取配送地址','ok','地址、数量字段完整'],
+    ['03:21','抓取追踪信息','ok','2 个跟踪号'],
+    ['03:24','查询物流轨迹','ok','2 / 2 成功'],
+    ['03:26','执行四道校验','fail','地址填写异常：邮编 GL51 9PB 应为 GL51 9WR；未足额入库：FU985028114GB']]},
+  l8:{t:'异常捕捉日志 · 移除单级',sub:'R0NFUS0034　2026-08-24 03:07—03:15',rows:[
+    ['03:07','进入店铺','ok','紫鸟环境正常，已登录 US - Ontario 主账号'],
+    ['03:15','抓取配送地址','fail','爬虫获取数据失败：移除单详情页请求超时（60 秒无响应），重试 1 次仍超时'],
+    ['—','抓取追踪信息','skip','无数据，未执行'],
+    ['—','查询物流轨迹','skip','无跟踪号，未执行'],
+    ['—','执行四道校验','skip','无数据，未执行']]},
+  l9:{t:'异常捕捉日志 · 移除单级',sub:'R03TJU0066　2026-08-24 03:03—03:03',rows:[
+    ['03:03','进入店铺','fail','紫鸟浏览器登录异常：客户端未启动，店铺与环境绑定失效，程序无法进入店铺'],
+    ['—','抓取配送地址','skip','未进入店铺，未执行'],
+    ['—','抓取追踪信息','skip','无地址数据，未执行'],
+    ['—','查询物流轨迹','skip','无跟踪号，未执行'],
+    ['—','执行四道校验','skip','无数据，未执行']]},
+  l10:{t:'异常捕捉日志 · 跟踪号级',sub:'R0NFUS0071　2026-08-24 03:19—03:33',rows:[
+    ['03:19','进入店铺','ok','紫鸟环境正常，已登录 US - Ontario 主账号'],
+    ['03:21','抓取配送地址','ok','地址、数量字段完整'],
+    ['03:25','抓取追踪信息','part','FU985036700GB 正常；FU985036612GB 详情页请求超时，重试 1 次仍超时'],
+    ['03:30','查询物流轨迹','part','FU985036700GB 成功；FU985036612GB 无跟踪号数据'],
+    ['03:33','执行四道校验','part','FU985036700GB 四道通过；FU985036612GB 四道未判定']]}
+};
+
+function all(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+
+/* ================= 展开明细行 ================= */
+function toggle(g, el){
+  var rows = all('tr.childrow[data-g="'+g+'"]');
+  if(!rows.length){ return; }
+  var open = rows[0].style.display !== 'none';
+  for (var i=0;i<rows.length;i++){ rows[i].style.display = open ? 'none' : 'table-row'; }
+  el.innerHTML = open ? '&#9662;' : '&#9652;';
+}
+
+/* ================= 筛选：仅按「异常情况」 ================= */
+function applyFilter(){
+  var t = document.getElementById('fType').value;
+  var parents = all('tr.parent');
+  for (var i=0;i<parents.length;i++){
+    var p = parents[i];
+    var types = (p.getAttribute('data-types')||'').split(',');
+    var ok = (t==='all') || (types.indexOf(t)>=0) || (t==='any' && types.join('')!=='');
+    p.style.display = ok ? 'table-row' : 'none';
+    var kids = all('tr.childrow[data-g="'+p.getAttribute('data-g')+'"]');
+    for (var j=0;j<kids.length;j++){
+      kids[j].style.display = (ok && kids[j].style.display !== 'none') ? 'table-row' : 'none';
+    }
+  }
+  document.getElementById('fType').className = (t!=='all') ? 'on' : '';
+}
+function resetFilter(){
+  document.getElementById('fType').value = 'all';
+  applyFilter();
+}
+
+/* ================= 浮层 ================= */
+var popEl = document.getElementById('pop');
+function closePop(){ popEl.style.display='none'; }
+
+function showPop(e, cell){
+  e.stopPropagation();
+  var key = cell.getAttribute('data-pop');
+  var html = '';
+  if(XPOP[key]){
+    var d = XPOP[key];
+    html = '<h4>'+d.t+'<span>'+(d.sub||'')+'</span></h4>';
+    for (var i=0;i<d.rows.length;i++){
+      var hi = (d.hi===i) ? ' hi' : '';
+      html += '<div class="r'+hi+'"><span>'+d.rows[i][0]+'</span><span>'+d.rows[i][1]+'</span></div>';
+    }
+  } else if(LPOP[key]){
+    var g = LPOP[key];
+    html = '<h4>'+g.t+'<span>'+g.sub+'</span></h4>';
+    html += '<div class="loghd"><span>时间</span><span>环节</span><span>结果</span><span>说明</span></div>';
+    for (var j=0;j<g.rows.length;j++){
+      var r = g.rows[j];
+      html += '<div class="logrow"><span>'+r[0]+'</span><span>'+r[1]+'</span><span class="st '+r[2]+'">'+stName(r[2])+'</span><span class="rs">'+r[3]+'</span></div>';
+    }
+  } else { return; }
+
+  popEl.className = (LPOP[key] ? 'pop log' : 'pop');
+  popEl.innerHTML = html;
+  popEl.style.display = 'block';
+  var r2 = cell.getBoundingClientRect();
+  var top = r2.bottom + window.scrollY + 6;
+  var left = r2.left + window.scrollX;
+  var w = popEl.offsetWidth;
+  if(left + w > window.innerWidth - 12){ left = window.innerWidth - w - 12; }
+  if(top + popEl.offsetHeight > window.scrollY + window.innerHeight - 8){
+    top = r2.top + window.scrollY - popEl.offsetHeight - 6;
+  }
+  popEl.style.top = Math.max(6, top) + 'px';
+  popEl.style.left = Math.max(8, left) + 'px';
+}
+function stName(k){
+  return {'ok':'完成','part':'部分','fail':'异常','skip':'未执行'}[k] || k;
+}
+document.addEventListener('click', closePop);
+popEl.addEventListener('click', function(e){ e.stopPropagation(); });
+window.addEventListener('resize', closePop);
+applyFilter();
+</script>
+</body>
+</html>
